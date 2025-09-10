@@ -1,24 +1,33 @@
 // ClientApp/src/components/Search.jsx
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { createAPIEndpoint, ENDPOINTS } from '../api';
 
 export default function Search() {
-  const [q, setQ] = useState({ district: '', route: '', status: '' });
   const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState('');
+  const [district, setDistrict] = useState('');
+  const [route, setRoute] = useState('');
+  const [status, setStatus] = useState('Any');
   const navigate = useNavigate();
 
   useEffect(() => {
-    // TODO: replace with real API call.
-    setRows([
-      { id:'P-1001', district:'Sacramento', route:'I-80', postMile:1.2, status:'Working', createdOn:'2022-05-09T12:00:00Z' },
-      { id:'P-1002', district:'Fresno', route:'SR-99', postMile:8.5, status:'Submitted', createdOn:'2022-06-01T12:00:00Z' }
-    ]);
+    createAPIEndpoint(ENDPOINTS.ASSESSMENTPROFILE).fetchAll()
+      .then(res => setRows(res.data))
+      .catch(e => setErr(e.message || 'Failed to load'))
+      .finally(() => setLoading(false));
   }, []);
 
-  const onSearch = (e) => {
-    e.preventDefault();
-    // TODO: call backend with 'q' filters
-  };
+  const filtered = rows.filter(r => {
+    if (district && r.District !== district) return false;
+    if (route && r.Route !== route) return false;
+    if (status !== 'Any' && r.AssessmentStatus !== status) return false;
+    return true;
+  });
+
+  if (loading) return <div className="p-3">Loading…</div>;
+  if (err) return <div className="p-3 text-danger">Error: {err}</div>;
 
   return (
     <div className="container py-4">
@@ -26,35 +35,28 @@ export default function Search() {
 
       <div className="card card-soft mb-3">
         <div className="card-body">
-          <form className="row g-3" onSubmit={onSearch}>
+          <form className="row g-3" onSubmit={e=>e.preventDefault()}>
             <div className="col-sm-4">
               <label className="form-label">District</label>
-              <input className="form-control"
-                     value={q.district}
-                     onChange={e=>setQ({...q, district: e.target.value})}/>
+              <input className="form-control" value={district} onChange={e=>setDistrict(e.target.value)} />
             </div>
             <div className="col-sm-4">
               <label className="form-label">Route</label>
-              <input className="form-control"
-                     value={q.route}
-                     onChange={e=>setQ({...q, route: e.target.value})}/>
+              <input className="form-control" value={route} onChange={e=>setRoute(e.target.value)} />
             </div>
             <div className="col-sm-4">
               <label className="form-label">Status</label>
-              <select className="form-select"
-                      value={q.status}
-                      onChange={e=>setQ({...q, status: e.target.value})}>
-                <option value="">Any</option>
-                <option>Submitted</option>
+              <select className="form-select" value={status} onChange={e=>setStatus(e.target.value)}>
+                <option value="Any">Any</option>
+                <option>Not started</option>
                 <option>Working</option>
                 <option>Completed</option>
               </select>
             </div>
-
             <div className="col-12 d-flex gap-2">
               <button type="submit" className="btn btn-primary">Search</button>
               <button type="button" className="btn btn-outline-secondary"
-                      onClick={()=>setQ({ district:'', route:'', status:'' })}>
+                      onClick={()=>{ setDistrict(''); setRoute(''); setStatus('Any'); }}>
                 Clear
               </button>
             </div>
@@ -68,7 +70,7 @@ export default function Search() {
             <table className="table table-striped table-hover table-sm mb-0">
               <thead>
                 <tr>
-                  <th>Project ID</th>
+                  <th>ID</th>
                   <th>District</th>
                   <th>Route</th>
                   <th>Post Mile</th>
@@ -77,17 +79,19 @@ export default function Search() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map(r => (
-                  <tr key={r.id} role="button" onClick={()=>navigate(`/details/${r.id}`)}>
-                    <td>{r.id}</td>
-                    <td>{r.district}</td>
-                    <td>{r.route}</td>
-                    <td>{r.postMile}</td>
-                    <td>{r.status}</td>
-                    <td>{new Date(r.createdOn).toLocaleDateString()}</td>
+                {filtered.map(r => (
+                  <tr key={r.AssessmentID}
+                      role="button"
+                      onClick={()=>navigate(`/Details/${r.AssessmentID}`)}>
+                    <td>{r.AssessmentID}</td>
+                    <td>{r.District}</td>
+                    <td>{r.Route}</td>
+                    <td>{r.PostMile}</td>
+                    <td>{r.AssessmentStatus}</td>
+                    <td>{new Date(r.Date).toLocaleDateString()}</td>
                   </tr>
                 ))}
-                {rows.length === 0 && (
+                {filtered.length === 0 && (
                   <tr><td colSpan={6} className="text-muted text-center py-4">No results</td></tr>
                 )}
               </tbody>
